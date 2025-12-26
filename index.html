@@ -2,203 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TUUN bloodtest explain</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TUUN PDF</title>
+
+  <!-- できる限り早くPDFへ -->
+  <meta http-equiv="refresh" content="0; url=./TUUN_bloodtest_explain.pdf" />
+
+  <script>
+    // meta refreshが効かない環境向けの保険
+    window.location.replace("./TUUN_bloodtest_explain.pdf");
+  </script>
+
   <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      background: #0b0b0b;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                   "Hiragino Sans", "Noto Sans JP", Arial, sans-serif;
-    }
-
-    /* 上部ツールバー（最小） */
-    .bar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 10px;
-      background: rgba(0,0,0,0.65);
-      color: #fff;
-      z-index: 10;
-      backdrop-filter: blur(10px);
-    }
-    .bar button, .bar a {
-      appearance: none;
-      border: 1px solid rgba(255,255,255,0.25);
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      border-radius: 10px;
-      padding: 7px 10px;
-      font-size: 12px;
-      text-decoration: none;
-      line-height: 1;
-    }
-    .bar .spacer { flex: 1; }
-    .bar .label {
-      font-size: 12px;
-      opacity: 0.85;
-      white-space: nowrap;
-    }
-
-    /* 描画エリア */
-    .stage {
-      position: absolute;
-      top: 44px; left: 0; right: 0; bottom: 0;
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
-      display: flex;
-      justify-content: center;
-      padding: 12px 10px 18px;
-    }
-    canvas {
-      max-width: 100%;
-      height: auto;
-      background: #fff;
-      border-radius: 14px;
-    }
-
-    /* ローディング */
-    .loading {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      color: rgba(255,255,255,0.85);
-      font-size: 14px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+           "Hiragino Sans", "Noto Sans JP", Arial, sans-serif;
+           padding: 20px; }
   </style>
 </head>
 <body>
-  <div class="bar">
-    <button id="prev">←</button>
-    <button id="next">→</button>
-    <span class="label" id="pageLabel">1 / 1</span>
-    <span class="spacer"></span>
-    <button id="zoomOut">−</button>
-    <button id="zoomIn">＋</button>
-    <a href="./TUUN_bloodtest_explain.pdf" target="_blank" rel="noopener">PDFを開く</a>
-  </div>
-
-  <div class="stage" id="stage">
-    <canvas id="pdfCanvas"></canvas>
-  </div>
-
-  <div class="loading" id="loading">読み込み中…</div>
-
-  <!-- PDF.js -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
-  <script>
-    // PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
-
-    const url = "./TUUN_bloodtest_explain.pdf";
-
-    const canvas = document.getElementById("pdfCanvas");
-    const ctx = canvas.getContext("2d", { alpha: false });
-
-    const loading = document.getElementById("loading");
-    const pageLabel = document.getElementById("pageLabel");
-
-    const prevBtn = document.getElementById("prev");
-    const nextBtn = document.getElementById("next");
-    const zoomInBtn = document.getElementById("zoomIn");
-    const zoomOutBtn = document.getElementById("zoomOut");
-
-    let pdfDoc = null;
-    let pageNum = 1;
-    let totalPages = 1;
-
-    // “勝手に拡大”を防ぐ：初期は画面幅フィットに固定
-    let zoom = 1.0;
-
-    function getFitZoom(viewportWidth, pageViewportWidth) {
-      // スマホで「最初から読みやすいが拡大しすぎない」バランス
-      const fit = viewportWidth / pageViewportWidth;
-      // 上限下限（必要なら調整）
-      return Math.min(Math.max(fit, 0.75), 1.25);
-    }
-
-    async function renderPage(num) {
-      loading.style.display = "grid";
-
-      const page = await pdfDoc.getPage(num);
-
-      // 一旦 scale=1 でサイズ取得して「画面幅にフィット」するzoomを決める
-      const baseViewport = page.getViewport({ scale: 1 });
-      const stage = document.getElementById("stage");
-      const availableWidth = Math.min(stage.clientWidth - 20, 1200);
-
-      if (num === 1 && zoom === 1.0) {
-        zoom = getFitZoom(availableWidth, baseViewport.width);
-      }
-
-      const viewport = page.getViewport({ scale: zoom });
-
-      // 高DPI対応
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = Math.floor(viewport.width) + "px";
-      canvas.style.height = Math.floor(viewport.height) + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      pageLabel.textContent = `${pageNum} / ${totalPages}`;
-      prevBtn.disabled = pageNum <= 1;
-      nextBtn.disabled = pageNum >= totalPages;
-
-      loading.style.display = "none";
-      // ページ切り替え時は先頭に戻す
-      document.getElementById("stage").scrollTop = 0;
-    }
-
-    async function init() {
-      pdfDoc = await pdfjsLib.getDocument(url).promise;
-      totalPages = pdfDoc.numPages;
-      await renderPage(pageNum);
-    }
-
-    prevBtn.addEventListener("click", async () => {
-      if (pageNum <= 1) return;
-      pageNum--;
-      await renderPage(pageNum);
-    });
-
-    nextBtn.addEventListener("click", async () => {
-      if (pageNum >= totalPages) return;
-      pageNum++;
-      await renderPage(pageNum);
-    });
-
-    zoomInBtn.addEventListener("click", async () => {
-      zoom = Math.min(zoom * 1.15, 2.5);
-      await renderPage(pageNum);
-    });
-
-    zoomOutBtn.addEventListener("click", async () => {
-      zoom = Math.max(zoom / 1.15, 0.5);
-      await renderPage(pageNum);
-    });
-
-    // 画面回転・リサイズ時も「幅フィット」を再計算
-    window.addEventListener("resize", async () => {
-      // リサイズ時はフィット基準に戻す（ユーザーの意図したズームを壊したくなければ外してOK）
-      zoom = 1.0;
-      await renderPage(pageNum);
-    });
-
-    init().catch(err => {
-      loading.textContent = "読み込みに失敗しました。下のリンクからPDFを開いてください。";
-      console.error(err);
-    });
-  </script>
+  自動で開かない場合は
+  <a href="./TUUN_bloodtest_explain.pdf">こちら</a>
+  をタップしてください。
 </body>
 </html>
